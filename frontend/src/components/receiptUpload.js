@@ -6,6 +6,7 @@ const API_URL = process.env.REACT_APP_API_ENDPOINT;
 
 const ReceiptUpload = ({ setExtractedItems }) => {
     const [file, setFile] = useState(null);
+    const [extractedItems, setLocalExtractedItems] = useState([]); 
     const [uploadStatus, setUploadStatus] = useState("");
 
     const handleFileChange = (e) => setFile(e.target.files[0]);
@@ -16,7 +17,9 @@ const ReceiptUpload = ({ setExtractedItems }) => {
         setUploadStatus("Processing...");
         Tesseract.recognize(file, "eng", { logger: (m) => console.log(m) })
             .then(({ data: { text } }) => {
-                processExtractedText(text);
+                const extractedData = processExtractedText(text);
+                setLocalExtractedItems(extractedData);
+                setExtractedItems(extractedData);
                 setUploadStatus("Extracted text successfully!");
             })
             .catch(error => {
@@ -56,23 +59,27 @@ const ReceiptUpload = ({ setExtractedItems }) => {
             }
         });
 
-        setExtractedItems(groceryItems);
+        return groceryItems;
     };
 
     const handleSaveToDB = async () => {
-        if (!file || !setExtractedItems) return;
+        if (!file || extractedItems.length === 0) {
+            setUploadStatus("No items to save.");
+            return;
+        }
 
         const formData = new FormData();
         formData.append("receipt", file);
-        formData.append("items", JSON.stringify(setExtractedItems));
+        formData.append("items", JSON.stringify(extractedItems));
 
-        try {
-            await axios.post(`${API_URL}/receipts`, formData);
-            setUploadStatus("Saved to database!");
-        } catch (error) {
+        axios.post(`${API_URL}/receipts`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        }).then(() => {
+            setUploadStatus("Receipt saved to database!");
+        }).catch(error => {
             console.error("Error saving receipt:", error);
-            setUploadStatus("Failed to save receipt.");
-        }
+            setUploadStatus("Error saving receipt.");
+        });
     };
 
     return (

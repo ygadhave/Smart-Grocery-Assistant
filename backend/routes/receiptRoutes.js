@@ -3,18 +3,24 @@ const multer = require("multer");
 const { Client } = require("pg");
 const dotenv = require("dotenv");
 const path = require("path");
+const fs = require("fs");
 
 dotenv.config();
 const router = express.Router();
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 client.connect();
 
+const UPLOADS_DIR = "uploads";
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR);
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/");
+        cb(null, UPLOADS_DIR);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); 
+        cb(null, Date.now() + path.extname(file.originalname));
     }
 });
 const upload = multer({ storage });
@@ -36,8 +42,12 @@ client.query(`
 
 router.post("/", upload.single("receipt"), async (req, res) => {
     try {
+        if (!req.file) {
+            return res.status(400).json({ message: "No receipt file uploaded" });
+        }
+
         const filename = req.file.filename;
-        const { items } = req.body;
+        const items = req.body.items ? JSON.parse(req.body.items) : [];
 
         const receiptResult = await client.query(
             "INSERT INTO receipts (filename) VALUES ($1) RETURNING id",
@@ -45,13 +55,15 @@ router.post("/", upload.single("receipt"), async (req, res) => {
         );
         const receiptId = receiptResult.rows[0].id;
 
-        const itemQueries = items.map(item =>
-            client.query(
-                "INSERT INTO extracted_items (receipt_id, name, quantity, unit) VALUES ($1, $2, $3, $4)",
-                [receiptId, item.name, item.quantity, item.unit]
-            )
-        );
-        await Promise.all(itemQueries);
+        if (items.length > 0) {
+            const itemQueries = items.map(item =>
+                client.query(
+                    "INSERT INTO extracted_items (receipt_id, name, quantity, unit) VALUES ($1, $2, $3, $4)",
+                    [receiptId, item.name, item.quantity, item.unit]
+                )
+            );
+            await Promise.all(itemQueries);
+        }
 
         res.json({ message: "Receipt uploaded & data saved!", receiptId });
     } catch (error) {
@@ -77,10 +89,32 @@ router.get("/:id/items", async (req, res) => {
         ]);
         res.json(result.rows);
     } catch (error) {
-        console.error("Error fetching items:", error);
+        console.error("Error fetching extracted items:", error);
         res.status(500).json({ message: "Error fetching extracted items" });
     }
 });
 
-module.exports = router;
+router.delete("/:id", async (req, res) => {
+    try {
+        const result = await client.query("SELECT filename FROM receipts WHERE id = $1", [req.params.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Receipt not found" });
+        }
 
+        const filename = result.rows[0].filename;
+        const filePath = path.join(__dirname, "../uploads", filename);
+
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        await client.query("DELETE FROM receipts WHERE id = $1", [req.params.id]);
+
+        res.json({ message: "Receipt deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting receipt:", error);
+        res.status(500).json({ message: "Error deleting receipt" });
+    }
+});
+
+module.exports = router;
