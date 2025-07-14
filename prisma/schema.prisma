@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------
+// USERS
+// -------------------
+model User {
+  id         String    @id @default(uuid()) @db.Uuid
+  email      String    @unique
+  password   String?   // hashed password (nullable for guest users)
+  createdAt  DateTime  @default(now())
+  isGuest    Boolean   @default(false)
+
+  pantryItems   PantryItem[]
+  receipts      Receipt[]
+  shoppingLists ShoppingList[]
+
+  @@map("users")
+}
+
+
+// -------------------
+// PANTRY ITEMS
+// -------------------
+model PantryItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  name        String
+  quantity    Int      @default(1)
+  unit        String?
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("pantry_items")
+}
+
+// -------------------
+// RECEIPTS
+// -------------------
+model Receipt {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @db.Uuid
+  storeName     String?
+  purchaseDate  DateTime
+  totalAmount   Decimal      @db.Decimal(10, 2)
+  createdAt     DateTime     @default(now())
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items         ReceiptItem[]
+
+  @@map("receipts")
+}
+
+// -------------------
+// RECEIPT ITEMS
+// -------------------
+model ReceiptItem {
+  id         String    @id @default(uuid()) @db.Uuid
+  receiptId  String    @db.Uuid
+  name       String
+  quantity   Int       @default(1)
+  unitPrice  Decimal   @db.Decimal(10, 2)
+  totalPrice Decimal   @db.Decimal(10, 2)
+
+  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@map("receipt_items")
+}
+
+// -------------------
+// SHOPPING LISTS
+// -------------------
+model ShoppingList {
+  id         String              @id @default(uuid()) @db.Uuid
+  userId     String              @db.Uuid
+  name       String
+  createdAt  DateTime            @default(now())
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      ShoppingListItem[]
+
+  @@map("shopping_lists")
+}
+
+// -------------------
+// SHOPPING LIST ITEMS
+// -------------------
+model ShoppingListItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  listId    String   @db.Uuid
+  name      String
+  quantity  Int      @default(1)
+  unit      String?
+  isChecked Boolean  @default(false)
+
+  list      ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@map("shopping_list_items")
+}
