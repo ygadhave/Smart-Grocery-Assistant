@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +51,6 @@ export default function ShoppingLists() {
     const res = await fetch("/api/shopping-lists", { credentials: "include" });
     const data = await res.json();
     if (res.ok) setLists(data);
-    else console.error("Failed to fetch lists", data);
   };
 
   useEffect(() => {
@@ -70,8 +68,6 @@ export default function ShoppingLists() {
     if (res.ok) {
       setNewListName("");
       fetchLists();
-    } else {
-      console.error("Failed to create list");
     }
   };
 
@@ -81,7 +77,6 @@ export default function ShoppingLists() {
       credentials: "include",
     });
     if (res.ok) fetchLists();
-    else console.error("Failed to delete list");
   };
 
   const handleAddItem = async (e: FormEvent) => {
@@ -103,8 +98,6 @@ export default function ShoppingLists() {
       setNewItemQuantity(1);
       setNewItemUnit("");
       fetchLists();
-    } else {
-      console.error("Failed to add item");
     }
   };
 
@@ -114,7 +107,16 @@ export default function ShoppingLists() {
       credentials: "include",
     });
     if (res.ok) fetchLists();
-    else console.error("Failed to delete item");
+  };
+
+  const handleToggleItem = async (itemId: string, currentChecked: boolean) => {
+    await fetch("/api/shopping-lists/items", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: itemId, isChecked: !currentChecked }),
+    });
+    fetchLists();
   };
 
   const filteredLists = lists.filter((list) =>
@@ -237,12 +239,17 @@ export default function ShoppingLists() {
                   key={item.id}
                   className="flex items-center space-x-2 p-2 rounded hover:bg-accent"
                 >
-                  <Checkbox checked={item.isChecked} />
-                  <span
-                    className={
-                      item.isChecked ? "line-through text-muted-foreground" : ""
+                  <Checkbox
+                    checked={item.isChecked}
+                    onCheckedChange={() =>
+                      handleToggleItem(item.id, item.isChecked)
                     }
-                  >
+                  />
+                  <span className={
+                      item.isChecked
+                        ? "line-through text-muted-foreground"
+                        : ""
+                    }>
                     {item.name} ({item.quantity} {item.unit})
                   </span>
                   <Button
@@ -259,7 +266,9 @@ export default function ShoppingLists() {
         ))}
       </div>
 
-      <h2 className="text-xl font-bold mt-8">Shopping Lists Visualizations</h2>
+      <h2 className="text-xl font-bold mt-8">
+        Shopping Lists Visualizations
+      </h2>
       <ShoppingListsBarChart lists={chartLists} />
       <ShoppingListsCompletionChart lists={chartLists} />
     </div>

@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { generatePastelPalette } from "../lib/utils";   // ← updated path
+import { generatePastelPalette } from "@/lib/utils";
 
 ChartJS.register(
   CategoryScale,
@@ -26,7 +26,7 @@ ChartJS.register(
 export interface Receipt {
   id: number;
   store: string;
-  date: string;   // ISO yyyy-MM-dd
+  date: string;
   total: number;
 }
 
@@ -35,14 +35,11 @@ interface ReceiptsLineChartProps {
 }
 
 export default function ReceiptsLineChart({ receipts }: ReceiptsLineChartProps) {
-  // sort by date for the x–axis
   const sorted = [...receipts].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
   const labels = sorted.map((r) => r.date);
-
-  // pick one pastel color for the line
   const [lineColor] = generatePastelPalette(1);
 
   const data = {
@@ -52,8 +49,9 @@ export default function ReceiptsLineChart({ receipts }: ReceiptsLineChartProps) 
         label: "Total Spent",
         data: sorted.map((r) => r.total),
         borderColor: lineColor,
-        backgroundColor: lineColor.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/,
-          (_match, r, g, b) => `rgba(${r}, ${g}, ${b}, 0.2)`
+        backgroundColor: lineColor.replace(
+          /rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/,
+          (_m, r, g, b) => `rgba(${r}, ${g}, ${b}, 0.2)`
         ),
       },
     ],

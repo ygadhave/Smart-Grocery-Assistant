@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -20,7 +20,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Upload, Trash2 } from "lucide-react";
+import { Search, Upload, Trash2 } from "lucide-react";
+import Tesseract from "tesseract.js";
 import type { Receipt as ReceiptType } from "@/components/ReceiptsLineChart";
 
 const ReceiptsLineChart = dynamic<{ receipts: ReceiptType[] }>(
@@ -50,28 +51,66 @@ interface Receipt {
 export default function Receipts() {
   const [search, setSearch] = useState("");
   const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [storeName, setStoreName] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
+
+  const fetchReceipts = async () => {
+    const res = await fetch("/api/receipts", { credentials: "include" });
+    if (res.ok) setReceipts(await res.json());
+  };
 
   useEffect(() => {
-    (async () => {
-      const res = await fetch("/api/receipts", { credentials: "include" });
-      if (res.ok) {
-        setReceipts(await res.json());
-      } else {
-        console.error("Failed to load receipts");
-      }
-    })();
+    fetchReceipts();
   }, []);
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+    const buffer = file;
+    const worker = await Tesseract.createWorker();
+    await worker.load();
+    await worker.reinitialize("eng");
+    const { data: { text } } = await worker.recognize(buffer);
+    await worker.terminate();
+    const lines: string[] = text
+      .split("\n")
+      .map((l: string) => l.trim())
+      .filter((l: string) => !!l);
+    const items = lines.map((line: string) => {
+      const parts = line.split(/\s+/);
+      const last = parts.pop();
+      const price = parseFloat(last?.replace(/[^0-9.]/g, "") || "") || 0;
+      const name = parts.join(" ");
+      return { name, quantity: 1, unitPrice: price, totalPrice: price };
+    });
+    const totalAmount = items.reduce(
+      (sum: number, i: { totalPrice: number }) => sum + i.totalPrice,
+      0
+    );
+    const form = new FormData();
+    form.append("file", file);
+    form.append("storeName", storeName);
+    form.append("purchaseDate", purchaseDate);
+    const res = await fetch("/api/receipts", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (res.ok) {
+      setReceipts(await res.json());
+      setFile(null);
+      setStoreName("");
+      setPurchaseDate("");
+    }
+  };
 
   const handleDeleteReceipt = async (id: string) => {
     const res = await fetch(`/api/receipts?id=${id}`, {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) {
-      setReceipts((prev) => prev.filter((r) => r.id !== id));
-    } else {
-      console.error("Failed to delete receipt");
-    }
+    if (res.ok) setReceipts((prev) => prev.filter((r) => r.id !== id));
   };
 
   const filtered = receipts.filter((r) =>
@@ -110,26 +149,25 @@ export default function Receipts() {
               <DialogHeader>
                 <DialogTitle>Upload Receipt</DialogTitle>
               </DialogHeader>
-              <form
-                className="space-y-4"
-                onSubmit={async (e: FormEvent<HTMLFormElement>) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const res = await fetch("/api/receipts", {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                  });
-                  if (res.ok) {
-                    setReceipts(await res.json());
-                  } else {
-                    console.error("Failed to upload receipt");
-                  }
-                }}
-              >
-                <Input type="file" name="file" accept="image/*" required />
-                <Input name="storeName" placeholder="Store name" required />
-                <Input name="purchaseDate" type="date" required />
+              <form className="space-y-4" onSubmit={handleUpload}>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  required
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+                <Input
+                  placeholder="Store name"
+                  required
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                />
+                <Input
+                  type="date"
+                  required
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                />
                 <Button type="submit" className="w-full">
                   Upload
                 </Button>
@@ -138,14 +176,15 @@ export default function Receipts() {
           </Dialog>
         </div>
       </div>
-
       <div className="grid gap-6">
         {filtered.map((receipt) => (
           <Card key={receipt.id} className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-semibold">{receipt.storeName}</h2>
-                <p className="text-muted-foreground">{receipt.purchaseDate}</p>
+                <p className="text-muted-foreground">
+                  {receipt.purchaseDate}
+                </p>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="text-right">
@@ -188,12 +227,9 @@ export default function Receipts() {
           </Card>
         ))}
       </div>
-
       <h2 className="text-xl font-bold mt-8">Receipts Visualizations</h2>
       <ReceiptsLineChart receipts={chartReceipts} />
       <ReceiptsStoreChart receipts={chartReceipts} />
     </div>
   );
 }
-
-

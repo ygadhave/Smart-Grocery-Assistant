@@ -1,4 +1,3 @@
-// app/api/receipts/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserIdFromCookie } from "@/lib/getUserId";
