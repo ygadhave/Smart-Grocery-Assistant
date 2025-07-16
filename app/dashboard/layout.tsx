@@ -39,9 +39,12 @@ export default function DashboardLayout({
     try {
       const res = await fetch("/api/auth/logout", {
         method: "POST",
-        credentials: "include",
+        credentials: "include",   // make sure browser sees the Set-Cookie header
       });
       if (!res.ok) throw new Error("Logout failed");
+
+      // Clear out any stale token you might have stored
+      localStorage.removeItem("token");
 
       toast({
         title: "Logged out",
@@ -100,8 +103,16 @@ export default function DashboardLayout({
           ))}
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t space-y-2">
-          <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
           </Button>
           <Button variant="outline" className="w-full" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
@@ -134,8 +145,16 @@ export default function DashboardLayout({
             ))}
           </nav>
           <div className="p-4 border-t space-y-2">
-            <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
             </Button>
             <Button variant="outline" className="w-full" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
@@ -148,7 +167,11 @@ export default function DashboardLayout({
       {/* Mobile top bar */}
       <div className="lg:hidden">
         <div className="flex h-16 items-center gap-x-4 border-b px-4">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+          >
             <Menu className="h-6 w-6" />
           </Button>
           <h1 className="text-lg font-semibold">Smart Grocery</h1>
