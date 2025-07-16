@@ -10,14 +10,16 @@ export default function Home() {
 
   async function handleGuest() {
     try {
-      const res = await fetch("/api/auth/guest");
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem("token", data.token);
-        router.push("/dashboard");
-      } else {
+      // ① include credentials so the HTTP-only cookie is set
+      const res = await fetch("/api/auth/guest", {
+        credentials: "include",
+      });
+      if (!res.ok) {
         console.error("Guest sign in failed");
+        return;
       }
+      // ② no localStorage needed—cookie is enough
+      router.push("/dashboard");
     } catch (err) {
       console.error("Error during guest sign in:", err);
     }
