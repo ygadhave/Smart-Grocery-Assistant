@@ -54,8 +54,21 @@ export default function Dashboard() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchPantry();
+    bootstrapPantry();
   }, []);
+
+  /** 
+   * 1️⃣ Call guest-auth so the HTTP-only cookie is set,
+   * 2️⃣ then load pantry items with that cookie in place.
+   */
+  async function bootstrapPantry() {
+    const authRes = await fetch("/api/auth/guest", { credentials: "include" });
+    if (!authRes.ok) {
+      console.error("Failed to authenticate as guest");
+      return;
+    }
+    fetchPantry();
+  }
 
   async function fetchPantry() {
     const res = await fetch("/api/pantry", { credentials: "include" });
