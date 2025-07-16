@@ -47,32 +47,15 @@ export default function ShoppingLists() {
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemUnit, setNewItemUnit] = useState("");
 
-  // 🔑 replace fetchLists() on mount with a two-step bootstrap
-  useEffect(() => {
-    bootstrapLists();
-  }, []);
-
-  /** 
-   * 1️⃣ call guest-auth so the browser gets the HTTP-only cookie,
-   * 2️⃣ then load your actual shopping-lists data
-   */
-  async function bootstrapLists() {
-    const authRes = await fetch("/api/auth/guest", { credentials: "include" });
-    if (!authRes.ok) {
-      console.error("Failed to authenticate guest");
-      return;
-    }
-    fetchLists();
-  }
-
-  async function fetchLists() {
+  const fetchLists = async () => {
     const res = await fetch("/api/shopping-lists", { credentials: "include" });
-    if (res.ok) {
-      setLists(await res.json());
-    } else {
-      console.error("Failed to load shopping lists");
-    }
-  }
+    const data = await res.json();
+    if (res.ok) setLists(data);
+  };
+
+  useEffect(() => {
+    fetchLists();
+  }, []);
 
   const handleCreateList = async (e: FormEvent) => {
     e.preventDefault();
@@ -85,8 +68,6 @@ export default function ShoppingLists() {
     if (res.ok) {
       setNewListName("");
       fetchLists();
-    } else {
-      console.error("Failed to create list");
     }
   };
 
@@ -96,7 +77,6 @@ export default function ShoppingLists() {
       credentials: "include",
     });
     if (res.ok) fetchLists();
-    else console.error("Failed to delete list");
   };
 
   const handleAddItem = async (e: FormEvent) => {
@@ -118,8 +98,6 @@ export default function ShoppingLists() {
       setNewItemQuantity(1);
       setNewItemUnit("");
       fetchLists();
-    } else {
-      console.error("Failed to add item");
     }
   };
 
@@ -129,18 +107,16 @@ export default function ShoppingLists() {
       credentials: "include",
     });
     if (res.ok) fetchLists();
-    else console.error("Failed to delete item");
   };
 
   const handleToggleItem = async (itemId: string, currentChecked: boolean) => {
-    const res = await fetch("/api/shopping-lists/items", {
+    await fetch("/api/shopping-lists/items", {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: itemId, isChecked: !currentChecked }),
     });
-    if (res.ok) fetchLists();
-    else console.error("Failed to toggle item");
+    fetchLists();
   };
 
   const filteredLists = lists.filter((list) =>
@@ -159,12 +135,11 @@ export default function ShoppingLists() {
 
   return (
     <div className="space-y-6">
-      {/* Header + New List */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <h1 className="text-2xl font-bold">Shopping Lists</h1>
         <div className="flex gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search lists..."
               value={search}
@@ -199,7 +174,6 @@ export default function ShoppingLists() {
         </div>
       </div>
 
-      {/* List Cards */}
       <div className="grid gap-6 md:grid-cols-2">
         {filteredLists.map((list) => (
           <Card key={list.id} className="p-6">
@@ -271,13 +245,11 @@ export default function ShoppingLists() {
                       handleToggleItem(item.id, item.isChecked)
                     }
                   />
-                  <span
-                    className={
+                  <span className={
                       item.isChecked
                         ? "line-through text-muted-foreground"
                         : ""
-                    }
-                  >
+                    }>
                     {item.name} ({item.quantity} {item.unit})
                   </span>
                   <Button
@@ -294,8 +266,9 @@ export default function ShoppingLists() {
         ))}
       </div>
 
-      {/* Visualizations */}
-      <h2 className="text-xl font-bold mt-8">Shopping Lists Visualizations</h2>
+      <h2 className="text-xl font-bold mt-8">
+        Shopping Lists Visualizations
+      </h2>
       <ShoppingListsBarChart lists={chartLists} />
       <ShoppingListsCompletionChart lists={chartLists} />
     </div>
