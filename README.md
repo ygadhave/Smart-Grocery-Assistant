@@ -28,7 +28,8 @@ A full-stack web application designed to simplify grocery management through rec
 
 ## Screenshots
 
-
+![alt text](<Screenshot 2025-09-22 at 6.14.55 PM.png>)
+![alt text](<Screenshot 2025-09-22 at 6.23.40 PM.png>)
 
 ---
 
