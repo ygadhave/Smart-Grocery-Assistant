@@ -28,13 +28,14 @@ A full-stack web application designed to simplify grocery management through rec
 
 ## Screenshots
 
-*(Add actual screenshots below when available)*
+
 
 ---
 
 ## Deployment
 
 This application is designed for seamless deployment on [Vercel](https://vercel.com), offering optimized performance and developer experience for Next.js projects.
+[Link](https://smart-grocery-assistant-sigma.vercel.app).
 
 ---
 
