@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
+export const runtime = "nodejs";
+
 export async function POST() {
   const cookieStore = cookies();
   const token = cookieStore.get("token")?.value;
@@ -21,6 +23,26 @@ export async function POST() {
         });
 
         await prisma.shoppingListItem.deleteMany({
+          where: {
+            list: {
+              userId: user.id,
+            },
+          },
+        });
+
+        await prisma.shoppingList.deleteMany({
+          where: { userId: user.id },
+        });
+
+        await prisma.receiptItem.deleteMany({
+          where: {
+            receipt: {
+              userId: user.id,
+            },
+          },
+        });
+
+        await prisma.receipt.deleteMany({
           where: { userId: user.id },
         });
 
@@ -28,7 +50,9 @@ export async function POST() {
           where: { id: user.id },
         });
       }
-    } catch {}
+    } catch (err) {
+      console.error("Guest logout cleanup error:", err);
+    }
   }
 
   const res = NextResponse.json({ message: "Logged out" });

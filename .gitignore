@@ -19,6 +19,7 @@ lerna-debug.log*
 dist/
 build/
 /out/
+.next/
 
 # Cache
 .cache/
