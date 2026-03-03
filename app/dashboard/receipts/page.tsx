@@ -6,14 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import dynamic from "next/dynamic";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -44,7 +36,7 @@ interface Receipt {
   id: string;
   storeName: string;
   purchaseDate: string;
-  totalAmount: number;
+  totalAmount: string | number;
   items: ReceiptItem[];
 }
 
@@ -54,6 +46,7 @@ export default function Receipts() {
   const [file, setFile] = useState<File | null>(null);
   const [storeName, setStoreName] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
+  const [isUploadOpen, setIsUploadOpen] = useState(false); // ✅ controlled dialog
 
   const fetchReceipts = async () => {
     const res = await fetch("/api/receipts", { credentials: "include" });
@@ -67,41 +60,77 @@ export default function Receipts() {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    const buffer = file;
+
     const worker = await Tesseract.createWorker();
     await worker.load();
     await worker.reinitialize("eng");
-    const { data: { text } } = await worker.recognize(buffer);
+
+    const {
+      data: { text },
+    } = await worker.recognize(file);
+
     await worker.terminate();
+
     const lines: string[] = text
       .split("\n")
       .map((l: string) => l.trim())
-      .filter((l: string) => !!l);
-    const items = lines.map((line: string) => {
-      const parts = line.split(/\s+/);
-      const last = parts.pop();
-      const price = parseFloat(last?.replace(/[^0-9.]/g, "") || "") || 0;
-      const name = parts.join(" ");
-      return { name, quantity: 1, unitPrice: price, totalPrice: price };
-    });
-    const totalAmount = items.reduce(
-      (sum: number, i: { totalPrice: number }) => sum + i.totalPrice,
-      0
+      .filter(Boolean);
+
+    // Only lines ending in price format
+    const priceRegex = /\d+\.\d{2}$/;
+
+    const items: ReceiptItem[] = lines
+      .filter((line: string) => priceRegex.test(line))
+      .map((line: string) => {
+        const match = line.match(/(.*)\s+(\d+\.\d{2})$/);
+        if (!match) return null;
+
+        const name = match[1].trim();
+        const price = parseFloat(match[2]);
+
+        return {
+          name,
+          quantity: 1,
+          unitPrice: price,
+          totalPrice: price,
+        };
+      })
+      .filter((item): item is ReceiptItem => !!item);
+
+    // Strict TOTAL line match
+    const totalLine = lines.find((line: string) =>
+      /^TOTAL\s+\d+\.\d{2}$/i.test(line)
     );
-    const form = new FormData();
-    form.append("file", file);
-    form.append("storeName", storeName);
-    form.append("purchaseDate", purchaseDate);
+
+    const totalAmount = totalLine
+      ? parseFloat(totalLine.match(/(\d+\.\d{2})$/)![1])
+      : items.reduce(
+          (sum: number, item: ReceiptItem) => sum + item.totalPrice,
+          0
+        );
+
     const res = await fetch("/api/receipts", {
       method: "POST",
       credentials: "include",
-      body: form,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        storeName,
+        purchaseDate,
+        totalAmount,
+        items,
+      }),
     });
+
     if (res.ok) {
       setReceipts(await res.json());
       setFile(null);
       setStoreName("");
       setPurchaseDate("");
+      setIsUploadOpen(false); // ✅ auto close modal
+    } else {
+      console.error("Upload failed:", await res.text());
     }
   };
 
@@ -110,7 +139,10 @@ export default function Receipts() {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) setReceipts((prev) => prev.filter((r) => r.id !== id));
+
+    if (res.ok) {
+      setReceipts((prev) => prev.filter((r) => r.id !== id));
+    }
   };
 
   const filtered = receipts.filter((r) =>
@@ -121,16 +153,17 @@ export default function Receipts() {
     id: Number(r.id),
     store: r.storeName,
     date: r.purchaseDate,
-    total: r.totalAmount,
+    total: Number(r.totalAmount),
   }));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <h1 className="text-2xl font-bold">Receipts</h1>
+
         <div className="flex gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search receipts..."
               value={search}
@@ -138,17 +171,21 @@ export default function Receipts() {
               className="pl-9"
             />
           </div>
-          <Dialog>
+
+          {/* ✅ Controlled Dialog */}
+          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Receipt
               </Button>
             </DialogTrigger>
+
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Upload Receipt</DialogTitle>
               </DialogHeader>
+
               <form className="space-y-4" onSubmit={handleUpload}>
                 <Input
                   type="file"
@@ -176,6 +213,7 @@ export default function Receipts() {
           </Dialog>
         </div>
       </div>
+
       <div className="grid gap-6">
         {filtered.map((receipt) => (
           <Card key={receipt.id} className="p-6">
@@ -186,15 +224,17 @@ export default function Receipts() {
                   {receipt.purchaseDate}
                 </p>
               </div>
+
               <div className="flex items-center space-x-4">
                 <div className="text-right">
                   <p className="text-xl font-semibold">
-                    ${receipt.totalAmount.toFixed(2)}
+                    ${Number(receipt.totalAmount).toFixed(2)}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {receipt.items.length} items
                   </p>
                 </div>
+
                 <Button
                   variant="ghost"
                   size="icon"
@@ -204,29 +244,10 @@ export default function Receipts() {
                 </Button>
               </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipt.items.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell className="text-right">
-                      ${item.totalPrice.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </Card>
         ))}
       </div>
+
       <h2 className="text-xl font-bold mt-8">Receipts Visualizations</h2>
       <ReceiptsLineChart receipts={chartReceipts} />
       <ReceiptsStoreChart receipts={chartReceipts} />

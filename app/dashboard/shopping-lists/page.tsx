@@ -47,6 +47,9 @@ export default function ShoppingLists() {
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemUnit, setNewItemUnit] = useState("");
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+
   const fetchLists = async () => {
     const res = await fetch("/api/shopping-lists", { credentials: "include" });
     const data = await res.json();
@@ -65,8 +68,10 @@ export default function ShoppingLists() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newListName }),
     });
+
     if (res.ok) {
       setNewListName("");
+      setIsCreateOpen(false); // ✅ close modal
       fetchLists();
     }
   };
@@ -82,6 +87,7 @@ export default function ShoppingLists() {
   const handleAddItem = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentListId) return;
+
     const res = await fetch("/api/shopping-lists/items", {
       method: "POST",
       credentials: "include",
@@ -93,10 +99,12 @@ export default function ShoppingLists() {
         unit: newItemUnit || null,
       }),
     });
+
     if (res.ok) {
       setNewItemName("");
       setNewItemQuantity(1);
       setNewItemUnit("");
+      setIsAddItemOpen(false); // ✅ close modal
       fetchLists();
     }
   };
@@ -137,9 +145,10 @@ export default function ShoppingLists() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <h1 className="text-2xl font-bold">Shopping Lists</h1>
+
         <div className="flex gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search lists..."
               value={search}
@@ -147,17 +156,21 @@ export default function ShoppingLists() {
               className="pl-9"
             />
           </div>
-          <Dialog>
+
+          {/* Create List Dialog */}
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 New List
               </Button>
             </DialogTrigger>
+
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Shopping List</DialogTitle>
               </DialogHeader>
+
               <form onSubmit={handleCreateList} className="space-y-4">
                 <Input
                   placeholder="List name"
@@ -179,9 +192,13 @@ export default function ShoppingLists() {
           <Card key={list.id} className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">{list.name}</h2>
+
               <div className="flex items-center space-x-2">
+                {/* Add Item Dialog */}
                 <Dialog
+                  open={isAddItemOpen && currentListId === list.id}
                   onOpenChange={(open) => {
+                    setIsAddItemOpen(open);
                     if (open) setCurrentListId(list.id);
                   }}
                 >
@@ -191,10 +208,12 @@ export default function ShoppingLists() {
                       Add Item
                     </Button>
                   </DialogTrigger>
+
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Add Item to {list.name}</DialogTitle>
                     </DialogHeader>
+
                     <form onSubmit={handleAddItem} className="space-y-4">
                       <Input
                         placeholder="Item name"
@@ -224,6 +243,7 @@ export default function ShoppingLists() {
                     </form>
                   </DialogContent>
                 </Dialog>
+
                 <Button
                   variant="ghost"
                   size="icon"
@@ -233,6 +253,7 @@ export default function ShoppingLists() {
                 </Button>
               </div>
             </div>
+
             <div className="space-y-2">
               {list.items.map((item) => (
                 <div
@@ -245,11 +266,13 @@ export default function ShoppingLists() {
                       handleToggleItem(item.id, item.isChecked)
                     }
                   />
-                  <span className={
+                  <span
+                    className={
                       item.isChecked
                         ? "line-through text-muted-foreground"
                         : ""
-                    }>
+                    }
+                  >
                     {item.name} ({item.quantity} {item.unit})
                   </span>
                   <Button
